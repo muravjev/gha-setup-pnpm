@@ -1,0 +1,76 @@
+name: "✨ Setup pnpm with cache"
+description: Prepares node environment with cached pnpm.
+branding:
+  color: blue
+  icon: tag
+
+inputs:
+  fetch-depth:
+    description: "Number of commits to fetch. 0 indicates all history for all branches and tags."
+    default: 1
+    required: false
+  node-version:
+    description: "The version of the node"
+    default: 18
+    required: false
+  pnpm-version:
+    description: "The version of the pnpm"
+    default: 7
+    required: false
+
+outputs:
+  cache-hit:
+    description: "Whether cache has been hit"
+    value: ${{ steps.pnpm-store-cache.outputs.cache-hit }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: ${{ inputs.fetch-depth }}
+
+    - name: Setup node
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ inputs.node_version }}
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2.2.4
+      with:
+        version: ${{ inputs.pnpm_version }}
+        run_install: false
+
+    - name: Get pnpm store path
+      id: pnpm-store-path
+      run: echo "PNPM_STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Setup pnpm store cache
+      id: pnpm-store-cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.pnpm-store-path.outputs.PNPM_STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        # restore-keys: |
+        #   ${{ runner.os }}-pnpm-store-
+
+    # - run: echo '## ✔ Setup pnpm ${{steps.pnpm-store-cache.outputs.cache-hit}}' >> $GITHUB_STEP_SUMMARY
+    #   shell: bash
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile --ignore-scripts &> /dev/null
+      shell: bash
+
+    # - if: success() && steps.pnpm-store-cache.outputs.cache-hit == 'true'
+    #   run: echo '## ✔ Setup succeeded with cache-hit' >> $GITHUB_STEP_SUMMARY
+    #   shell: bash
+
+    # - if: success() && steps.pnpm-store-cache.outputs.cache-hit == 'false'
+    #   run: echo '## ✔ Setup succeeded without cache-hit' >> $GITHUB_STEP_SUMMARY
+    #   shell: bash
+
+    # - if: failure()
+    #   run: echo '## ❌ Setup failed' >> $GITHUB_STEP_SUMMARY
+    #   shell: bash
